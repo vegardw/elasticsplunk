@@ -57,5 +57,5 @@ When earliest and latest parameters are specified this will be the effective ran
 |ess eaddr="https://node:9200" index=indexname tsfield="@timestamp" query="field:value" include_es=true | eval newfield="foo" | essupdate
 ```
 
-Written by Bruno Moura <brunotm@gmail.com>
+Written by Bruno Moura <brunotm@gmail.com>  
 Changes and additional commands by Vegard Wærp <vegardw@gmail.com>
