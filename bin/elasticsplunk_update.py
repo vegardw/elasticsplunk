@@ -1,3 +1,10 @@
+# vim: set fileencoding=utf-8:
+# ElasticSplunkUpdate
+# streaming command that updates an Elasticsearch document with fields from Splunl
+#
+# Written by Vegard Wærp, heavily based on ElasticSplunk by Bruno Moura
+#
+
 import sys
 import os
 import json

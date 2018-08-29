@@ -47,5 +47,15 @@ When earliest and latest parameters are specified this will be the effective ran
 |ess eaddr="https://node1:9200,https://node2:9200" action=cluster-health"
 ```
 
-Written by Bruno Moura <brunotm@gmail.com>
+## Correlation
+```
+<splunk command> | esscorrelate correlate_fields="src_ip,dest_ip" eaddr="https://node1:9200,https://node2:9200" index=indexname tsfield="@timestamp" query="field:value AND host:host*"
+```
 
+### Update Elasticsearch document
+```
+|ess eaddr="https://node:9200" index=indexname tsfield="@timestamp" query="field:value" include_es=true | eval newfield="foo" | essupdate
+```
+
+Written by Bruno Moura <brunotm@gmail.com>
+Changes and additional commands by Vegard Wærp <vegardw@gmail.com>
