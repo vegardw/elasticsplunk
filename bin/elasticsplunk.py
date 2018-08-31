@@ -54,6 +54,7 @@ KEY_CONFIG_LIMIT = "limit"
 KEY_CONFIG_QUERY = "query"
 KEY_CONFIG_NO_TIMESTAMP = "no_timestamp"
 KEY_CONFIG_CONVERT_TIMESTAMP = "convert_timestamp"
+KEY_CONFIG_GET_MAPPING = "get_mapping"
 
 # Splunk keys
 KEY_SPLUNK_TIMESTAMP = "_time"
@@ -85,6 +86,7 @@ class ElasticSplunk(GeneratingCommand):
     verify_certs = Option(require=False, default=None, doc="Verify SSL Certificates")
     no_timestamp = Option(require=False, default=False, doc="Elastic data has no timestamps, generate dummy")
     convert_timestamp = Option(require=False, default=True, doc="Convert timestamps from text to unix timestamp")
+    get_mapping = Option(require=False, default=False, doc="Get elasticsearch mapping and generate blank line with all fields")
     earliest = Option(require=False, default=None,
                       doc="Earliest event, format relative eg. now-4h or 2016-11-18T23:45:00")
     latest = Option(require=False, default=None,
@@ -197,11 +199,12 @@ class ElasticSplunk(GeneratingCommand):
         config[KEY_CONFIG_QUERY] = self.query
         config[KEY_CONFIG_NO_TIMESTAMP] = self.no_timestamp
         config[KEY_CONFIG_CONVERT_TIMESTAMP] = self.convert_timestamp
+        config[KEY_CONFIG_GET_MAPPING] = self.get_mapping
 
         return config
 
 
-    def _parse_hit(self, config, hit):
+    def _parse_hit(self, config, hit, all_fields):
         """Parse a Elasticsearch Hit"""
 
         event = {}
@@ -224,6 +227,10 @@ class ElasticSplunk(GeneratingCommand):
 
         if config[KEY_CONFIG_INCLUDE_RAW]:
             event[KEY_SPLUNK_RAW] = json.dumps(hit)
+
+        for field in all_fields:
+            if not field in event:
+                event[field] = None
 
         return event
 
@@ -253,6 +260,15 @@ class ElasticSplunk(GeneratingCommand):
 
     def _search(self, esclient, config):
         """Search Generate events to Splunk from a Elasticsearch search"""
+
+        all_fields = []
+        if self.get_mapping in [True, "true", "True", 1, "y"]:
+            mapping = esclient.indices.get_mapping(index=config[KEY_CONFIG_INDEX],
+                                           doc_type=config[KEY_CONFIG_SOURCE_TYPE],)
+            indices = gen_dict_extract("properties",mapping)
+            for fields in indices:
+                for field in fields:
+                        all_fields.append(field)
 
         # Search body
         # query-string-syntax
@@ -296,7 +312,7 @@ class ElasticSplunk(GeneratingCommand):
                                doc_type=config[KEY_CONFIG_SOURCE_TYPE],
                                query=body)
             for hit in res:
-                yield self._parse_hit(config, hit)
+                yield self._parse_hit(config, hit, all_fields)
         else:
             res = esclient.search(index=config[KEY_CONFIG_INDEX],
                                   size=config[KEY_CONFIG_LIMIT],
@@ -305,7 +321,7 @@ class ElasticSplunk(GeneratingCommand):
                                   doc_type=config[KEY_CONFIG_SOURCE_TYPE],
                                   body=body)
             for hit in res['hits']['hits']:
-                yield self._parse_hit(config, hit)
+                yield self._parse_hit(config, hit, all_fields)
 
     def generate(self):
         """Generate events to Splunk"""
@@ -335,5 +351,21 @@ def _flattern(key, data):
         else:
             result[key+"."+inkey] = data[inkey]
     return result
+
+# Find all occurrences of a key in nested python dictionaries and lists
+# By "hexerei software"
+# from https://stackoverflow.com/questions/9807634/find-all-occurrences-of-a-key-in-nested-python-dictionaries-and-lists
+def gen_dict_extract(key, var):
+    if hasattr(var,'iteritems'):
+        for k, v in var.iteritems():
+            if k == key:
+                yield v
+            if isinstance(v, dict):
+                for result in gen_dict_extract(key, v):
+                    yield result
+            elif isinstance(v, list):
+                for d in v:
+                    for result in gen_dict_extract(key, d):
+                        yield result
 
 dispatch(ElasticSplunk, sys.argv, sys.stdin, sys.stdout, __name__)
