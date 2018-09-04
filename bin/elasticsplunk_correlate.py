@@ -68,7 +68,7 @@ class ElasticSplunkCorrelate(StreamingCommand):
     return_mv = Option(require=False, default=False, doc="Return multivalue fields instead of separate records")
     eaddr = Option(require=False, default="127.0.0.1 9200", doc="server:port,server:port or config item")
     index = Option(require=False, default=None, doc="Index to search")
-    scan = Option(require=False, default=True, doc="Perform a scan search")
+    scan = Option(require=False, default=False, doc="Perform a scan search")
     stype = Option(require=False, default=None, doc="Source/doc_type")
     tsfield = Option(require=False, default="@timestamp", doc="Field holding the event timestamp")
     query = Option(require=False, default="*", doc="Query string in ES DSL")
