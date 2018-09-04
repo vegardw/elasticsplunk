@@ -50,6 +50,7 @@ KEY_CONFIG_QUERY = "query"
 KEY_CONFIG_NO_TIMESTAMP = "no_timestamp"
 KEY_CONFIG_CONVERT_TIMESTAMP = "convert_timestamp"
 KEY_CONFIG_RETURN_MV = "return_mv"
+KEY_CONFIG_MATCH_ANY = "match_any"
 
 # Splunk keys
 KEY_SPLUNK_TIMESTAMP = "_time"
@@ -65,6 +66,7 @@ DEFAULT_LATEST = "now"
 @Configuration()
 class ElasticSplunkCorrelate(StreamingCommand):
     correlate_fields = Option(require=True, default=None, doc="Fields to correlate")
+    match_any = Option(require=False, default=False, doc="Return results all results that match any of the correlation fields")
     return_mv = Option(require=False, default=False, doc="Return multivalue fields instead of separate records")
     eaddr = Option(require=False, default="127.0.0.1 9200", doc="server:port,server:port or config item")
     index = Option(require=False, default=None, doc="Index to search")
@@ -200,6 +202,7 @@ class ElasticSplunkCorrelate(StreamingCommand):
         config[KEY_CONFIG_NO_TIMESTAMP] = self.no_timestamp
         config[KEY_CONFIG_CONVERT_TIMESTAMP] = self.convert_timestamp
         config[KEY_CONFIG_RETURN_MV] = self.return_mv
+        config[KEY_CONFIG_MATCH_ANY] = self.match_any
 
         return config
 
@@ -244,10 +247,16 @@ class ElasticSplunkCorrelate(StreamingCommand):
 
     	# Populate body with correlation fields
         if config[KEY_CONFIG_CORRELATE_FIELDS]:
-            for field in config[KEY_CONFIG_CORRELATE_FIELDS]:
-              body["query"]["bool"]["must"].append({"match" : {field: record[field]}})
+            if self.match_any in [True, "true", "True", 1, "y"]:
+                dismax = {   "dis_max" : {"queries": []}}
+                #body["query"]["bool"]["must"].append({"dis_max" : {"queries": []}})
+                for field in config[KEY_CONFIG_CORRELATE_FIELDS]:
+                    dismax["dis_max"]["queries"].append({"match" : {field: record[field]}})
+                body["query"]["bool"]["must"].append(dismax)
+            else:
+                for field in config[KEY_CONFIG_CORRELATE_FIELDS]:
+                    body["query"]["bool"]["must"].append({"match" : {field: record[field]}})
 
-        
         # Execute search
         if self.scan in [True, "true", "True", 1, "y"]:
             res = helpers.scan(esclient,
@@ -271,6 +280,9 @@ class ElasticSplunkCorrelate(StreamingCommand):
 
     def _generate_row(self,config, hits, record):
         """Generate row(s) combining row piped from splunk and hit from Elasticsearch"""
+        for field in record:
+            if field in config[KEY_CONFIG_CORRELATE_FIELDS]:
+                record[field] = None
         if self.return_mv in [True, "true", "True", 1, "y"]:
             for hit in hits:
                 parsed = self._parse_hit(config, hit)
