@@ -193,16 +193,16 @@ class ElasticSplunkCorrelate(StreamingCommand):
         else:
             config[KEY_CONFIG_EARLIEST] = config[KEY_CONFIG_LATEST] - self.parse_dates(DEFAULT_EARLIEST)
 
-        config[KEY_CONFIG_SCAN] = self.scan
+        config[KEY_CONFIG_SCAN] = True self.scan in [True, "true", "True", 1, "y"] else False
         config[KEY_CONFIG_INDEX] = self.index
         config[KEY_CONFIG_INCLUDE_ES] = self.include_es
         config[KEY_CONFIG_INCLUDE_RAW] = self.include_raw
         config[KEY_CONFIG_LIMIT] = self.limit
         config[KEY_CONFIG_QUERY] = self.query
-        config[KEY_CONFIG_NO_TIMESTAMP] = self.no_timestamp
-        config[KEY_CONFIG_CONVERT_TIMESTAMP] = self.convert_timestamp
-        config[KEY_CONFIG_RETURN_MV] = self.return_mv
-        config[KEY_CONFIG_MATCH_ANY] = self.match_any
+        config[KEY_CONFIG_NO_TIMESTAMP] = True if self.no_timestamp in [True, "true", "True", 1, "y"] else False
+        config[KEY_CONFIG_CONVERT_TIMESTAMP] = True self.convert_timestamp in [True, "true", "True", 1, "y"] else False
+        config[KEY_CONFIG_RETURN_MV] = True if self.return_mv in [True, "true", "True", 1, "y"] else False
+        config[KEY_CONFIG_MATCH_ANY] = True self.match_any in [True, "true", "True", 1, "y"]: else False
 
         return config
 
@@ -212,7 +212,7 @@ class ElasticSplunkCorrelate(StreamingCommand):
         # Search body
         # query-string-syntax
         # www.elastic.co/guide/en/elasticsearch/reference/current/query-dsl-query-string-query.html
-        if self.no_timestamp in [True, "true", "True", 1, "y"]:
+        if config[KEY_CONFIG_NO_TIMESTAMP]:
             body = {
                 "query": {
                     "bool": {
@@ -247,7 +247,7 @@ class ElasticSplunkCorrelate(StreamingCommand):
 
     	# Populate body with correlation fields
         if config[KEY_CONFIG_CORRELATE_FIELDS]:
-            if self.match_any in [True, "true", "True", 1, "y"]:
+            if config[KEY_CONFIG_MATCH_ANY]:
                 dismax = {   "dis_max" : {"queries": []}}
                 #body["query"]["bool"]["must"].append({"dis_max" : {"queries": []}})
                 for field in config[KEY_CONFIG_CORRELATE_FIELDS]:
@@ -258,7 +258,7 @@ class ElasticSplunkCorrelate(StreamingCommand):
                     body["query"]["bool"]["must"].append({"match" : {field: record[field]}})
 
         # Execute search
-        if self.scan in [True, "true", "True", 1, "y"]:
+        if config[KEY_CONFIG_SCAN]:
             res = helpers.scan(esclient,
                                size=config[KEY_CONFIG_LIMIT],
                                index=config[KEY_CONFIG_INDEX],
@@ -283,7 +283,7 @@ class ElasticSplunkCorrelate(StreamingCommand):
         for field in record:
             if field in config[KEY_CONFIG_CORRELATE_FIELDS]:
                 record[field] = None
-        if self.return_mv in [True, "true", "True", 1, "y"]:
+        if config[KEY_CONFIG_RETURN_MV]:
             for hit in hits:
                 parsed = self._parse_hit(config, hit)
                 for a in parsed:
@@ -307,9 +307,9 @@ class ElasticSplunkCorrelate(StreamingCommand):
         """Parse a Elasticsearch Hit"""
 
         event = {}
-        if self.no_timestamp in [True, "true", "True", 1, "y"]:
+        if config[KEY_CONFIG_NO_TIMESTAMP]:
             event[KEY_SPLUNK_TIMESTAMP] = time.time()
-        elif self.convert_timestamp in [True, "true", "True", 1, "y"]:
+        elif config[KEY_CONFIG_CONVERT_TIMESTAMP]:
             event[KEY_SPLUNK_TIMESTAMP] = self.to_epoch(hit[KEY_ELASTIC_SOURCE][config[KEY_CONFIG_TIMESTAMP]])
         else:
             event[KEY_SPLUNK_TIMESTAMP] = hit[KEY_ELASTIC_SOURCE][config[KEY_CONFIG_TIMESTAMP]]
