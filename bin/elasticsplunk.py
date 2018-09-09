@@ -198,7 +198,7 @@ class ElasticSplunk(GeneratingCommand):
         config[KEY_CONFIG_LIMIT] = self.limit
         config[KEY_CONFIG_QUERY] = self.query
         config[KEY_CONFIG_NO_TIMESTAMP] = True if self.no_timestamp in [True, "true", "True", 1, "y"] else False
-        config[KEY_CONFIG_CONVERT_TIMESTAMP] = True self.convert_timestamp in [True, "true", "True", 1, "y"] else False
+        config[KEY_CONFIG_CONVERT_TIMESTAMP] = True if self.convert_timestamp in [True, "true", "True", 1, "y"] else False
         config[KEY_CONFIG_GET_MAPPING] = True if self.get_mapping in [True, "true", "True", 1, "y"] else False
 
         return config
