@@ -9,6 +9,8 @@ import re
 import sys
 import json
 import time
+import calendar
+from datetime import datetime
 from pprint import pprint
 from elasticsearch import Elasticsearch, helpers
 from splunklib.searchcommands import \
@@ -49,6 +51,7 @@ KEY_CONFIG_INCLUDE_ES = "include_es"
 KEY_CONFIG_INCLUDE_RAW = "include_raw"
 KEY_CONFIG_LIMIT = "limit"
 KEY_CONFIG_QUERY = "query"
+KEY_CONFIG_CONVERT_TIMESTAMP = "convert_timestamp"
 
 # Splunk keys
 KEY_SPLUNK_TIMESTAMP = "_time"
@@ -82,6 +85,7 @@ class ElasticSplunk(GeneratingCommand):
                       doc="Earliest event, format relative eg. now-4h or 2016-11-18T23:45:00")
     latest = Option(require=False, default=None,
                     doc="Latest event, format 2016-11-17T23:45:00")
+    convert_timestamp = Option(require=False, default=False, doc="Convert timestamps from text to unix timestamp")
 
     @staticmethod
     def parse_dates(time_value):
@@ -109,6 +113,13 @@ class ElasticSplunk(GeneratingCommand):
 
         if re.search(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$", time_value):
             return int(time.mktime(time.strptime(time_value, "%Y-%m-%dT%H:%M:%S")))
+
+
+    @staticmethod
+    def to_epoch(timestring):
+        """Convert UTC date string returned by elasticsearch to epoch"""
+        dt = datetime.strptime(timestring, "%Y-%m-%dT%H:%M:%S.%fZ")
+        return str(calendar.timegm(dt.timetuple())) + "." + str(dt.microsecond)
 
 
     def _get_search_config(self):
@@ -177,6 +188,7 @@ class ElasticSplunk(GeneratingCommand):
         config[KEY_CONFIG_INCLUDE_RAW] = self.include_raw
         config[KEY_CONFIG_LIMIT] = self.limit
         config[KEY_CONFIG_QUERY] = self.query
+        config[KEY_CONFIG_CONVERT_TIMESTAMP] = True if self.convert_timestamp in [True, "true", "True", 1, "y"] else False
 
         return config
 
@@ -185,7 +197,10 @@ class ElasticSplunk(GeneratingCommand):
         """Parse a Elasticsearch Hit"""
 
         event = {}
-        event[KEY_SPLUNK_TIMESTAMP] = hit[KEY_ELASTIC_SOURCE][config[KEY_CONFIG_TIMESTAMP]]
+        if config[KEY_CONFIG_CONVERT_TIMESTAMP]:
+            event[KEY_SPLUNK_TIMESTAMP] = self.to_epoch(hit[KEY_ELASTIC_SOURCE][config[KEY_CONFIG_TIMESTAMP]])
+        else:
+            event[KEY_SPLUNK_TIMESTAMP] = hit[KEY_ELASTIC_SOURCE][config[KEY_CONFIG_TIMESTAMP]]
         for key in hit[KEY_ELASTIC_SOURCE]:
             if key != config[KEY_CONFIG_TIMESTAMP]:
                 if isinstance(hit[KEY_ELASTIC_SOURCE][key], dict):
