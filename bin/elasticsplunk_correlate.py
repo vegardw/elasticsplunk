@@ -117,9 +117,9 @@ class ElasticSplunkCorrelate(StreamingCommand):
 
     @staticmethod
     def to_epoch(timestring):
-        tmp = datetime.strptime(timestring, "%Y-%m-%dT%H:%M:%S.%fZ")
-        tmp2 = tmp.timetuple()
-        return str(calendar.timegm(tmp2)) + "." + str(tmp.microsecond)
+        """Convert UTC date string returned by elasticsearch to epoch"""
+        dt = datetime.strptime(timestring, "%Y-%m-%dT%H:%M:%S.%fZ")
+        return str(calendar.timegm(dt.timetuple())) + "." + str(dt.microsecond)
     
     def _get_search_config(self):
         """Parse and configure search parameters"""
