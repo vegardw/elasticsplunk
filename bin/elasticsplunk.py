@@ -10,6 +10,7 @@ import sys
 import json
 import time
 import calendar
+import dateparser
 from datetime import datetime
 from pprint import pprint
 from elasticsearch import Elasticsearch, helpers
@@ -118,9 +119,9 @@ class ElasticSplunk(GeneratingCommand):
     @staticmethod
     def to_epoch(timestring):
         """Convert UTC date string returned by elasticsearch to epoch"""
-        dt = datetime.strptime(timestring, "%Y-%m-%dT%H:%M:%S.%fZ")
-        return str(calendar.timegm(dt.timetuple())) + "." + str(dt.microsecond)
-
+        dt = dateparser.parse(timestring)
+       	utc_dt = dt.replace(tzInfo=None) - dt.utcoffset()
+	return (utc_dt - datetime(1970, 1, 1)).total_seconds()
 
     def _get_search_config(self):
         """Parse and configure search parameters"""
